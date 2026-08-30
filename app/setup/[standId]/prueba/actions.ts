@@ -32,5 +32,5 @@ export async function finalizeStandStatus(
     });
   }
 
-  redirect("/stands");
+  redirect(`/setup/${standId}/tarjeta`);
 }
