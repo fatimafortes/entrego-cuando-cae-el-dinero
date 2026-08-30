@@ -2,10 +2,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/app/lib/supabase/server";
 import { getOrCreateCardBody } from "@/app/lib/cards/get-or-create-card-body";
 import { getBaseUrl } from "@/app/lib/url";
+import { CARD_HEADLINE, CARD_UNIVERSAL_LINE } from "@/app/lib/card-copy";
 import { CardPreview } from "@/app/setup/[standId]/tarjeta/card-preview";
-
-const HEADLINE = "Aquí entregamos cuando cae el dinero";
-const UNIVERSAL_LINE = "Es la regla de este puesto. Es para todos, siempre.";
 
 export default async function CardPage({
   params,
@@ -48,9 +46,9 @@ export default async function CardPage({
         </div>
 
         <CardPreview
-          headline={HEADLINE}
+          headline={CARD_HEADLINE}
           body={body}
-          universalLine={UNIVERSAL_LINE}
+          universalLine={CARD_UNIVERSAL_LINE}
           merchantName={stand.merchant_name}
           standType={stand.stand_type}
           ruleUrl={ruleUrl}
