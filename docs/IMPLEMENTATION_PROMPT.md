@@ -1,43 +1,169 @@
-Vamos a construir el ship de esta semana siguiendo exactamente docs/PACKET.md, que ya está en este repo. Antes de escribir código, lee docs/PACKET.md completo para tener el contexto.
+# IMPLEMENTATION PROMPT — "Entrego cuando cae el dinero"
 
-STACK: Next.js (frontend, en Vercel) + Supabase (Postgres + Auth). Sin integración real de preventa — usamos un feed de GPS/timestamp simulado, claramente etiquetado como tal en el código y en la UI.
+Derived from `docs/PACKET.md`. Hand this to the coding agent as the build specification.
 
-CONSTRUYE EN ESTE ORDEN, UN COMMIT POR CADA PASO (mínimo 5 commits):
+---
 
-COMMIT 1 — Setup del proyecto
-- Inicializa un proyecto Next.js básico
-- Conecta el proyecto a Supabase (variables de entorno en .env.local, NUNCA hardcodeadas — deben ir a Vercel env vars cuando desplegemos)
-- Crea dos tablas en Supabase:
-  - vendor_profiles: id, curp (18 chars, único), created_at, distributor_id
-  - entries: id, vendor_curp (FK a vendor_profiles), route_rep_id, amount, paid (boolean), timestamp, simulated_lat, simulated_lng, flagged_batch (boolean, default false)
-- Activa Row Level Security en ambas tablas: un route_rep solo puede ver/insertar entries donde route_rep_id = su propio usuario autenticado
-Criterio de aceptación: las tablas existen en Supabase, RLS está activo, puedo confirmarlo desde el dashboard de Supabase.
+## Context for the agent
 
-COMMIT 2 — Auth
-- Implementa Supabase Auth con "Sign in with Google" para el route rep
-- Página de login simple, redirige a la pantalla de logging una vez autenticado
-Criterio de aceptación: un usuario nuevo puede iniciar sesión con Google y llega a la pantalla principal; sin sesión, no puede ver ni la pantalla ni los datos.
+You are building one slice of a product that protects Mexican market-stall merchants from forged bank-transfer receipts. A merchant hands over goods against a *comprobante* that turns out to be an image edit; the money never arrives.
 
-COMMIT 3 — Pantalla de logging (basada en el mockup de docs/PACKET.md)
-- Formulario: selector de vendor stop (dropdown simple con vendedoras de prueba), campo de amount (numérico, validado, rango 0-5000), toggle paid/not-paid
-- Al enviar: genera un CURP simulado si el vendor no existe aún (auto-crea vendor_profiles), inserta el entry con un timestamp real y GPS SIMULADO (números aleatorios pequeños que emulan cercanía entre paradas)
-- Validación: CURP debe tener 18 caracteres: si el generado no cumple, muestra error y no permite enviar (aunque sea generado internamente, valida igual como práctica de la Security Floor)
-Criterio de aceptación: puedo loguear un pago en menos de 10 segundos reales, sin llenar ningún campo más allá de amount y paid/not-paid, como dice mi Success Definition.
+**The product does not examine the receipt.** It never reads it, never uploads it, never scores it. Do not add receipt analysis, fraud detection, or any classifier at any point. If a feature you are considering involves judging whether something is fake, it is out of scope by design.
 
-COMMIT 4 — Lógica de detección de lote (batch-entry)
-- Función server-side: al insertar un entry nuevo, compara su timestamp + GPS simulado contra los últimos 5 entries del mismo route_rep
-- Si están en una ventana de 2 minutos Y sin "movimiento" de GPS simulado entre ellos → marca flagged_batch = true
-- Esta función corre automáticamente, sin que el rep haga nada extra
-Criterio de aceptación: TP2 y TP3 de mi test plan pasan (5 entries juntos = flagged; 5 entries espaciados con GPS distinto = no flagged).
+What the product does instead: a supplier visits a stand, confirms that the merchant's bank deposit notification actually works, and leaves behind a printed card stating the stand's standing rule — goods leave when the money lands, for every buyer, every time.
 
-COMMIT 5 — Vista del distribuidor + inert enrollment
-- Pantalla simple de "distributor view": tabla con todos los entries, mostrando cuáles están flaggeados, sin poder editarlos
-- Confirma que un vendor_profile se crea automáticamente e inerte (sin ningún dato "activo" o "reclamado") apenas se registra su primer pago — esto ya debería estar cubierto por el Commit 3, aquí solo lo verificamos con un test manual
-Criterio de aceptación: TP1 y TP4 de mi test plan pasan.
+**Two roles, and they are not the same person.**
+- The **supplier** operates the app. He signs in. He is the only authenticated user.
+- The **merchant** (Jesús) is who the product protects. He installs nothing, signs into nothing, and memorizes nothing. There must be no merchant login anywhere in the product.
 
-DESPUÉS DE LOS 5 COMMITS:
-- Despliega a Vercel (necesito al menos 2 deploys distintos durante el proceso, no solo uno al final)
-- Al terminar cada commit, actualiza docs/DECISIONS.md con una línea explicando qué se decidió y por qué, y anota el primer paso de la siguiente sesión
-- Recuerda el Security Floor completo: nada de secrets en el código, auth obligatorio, RLS activo, validación de inputs, cero datos reales de personas.
+Interface language is **Spanish**. Code, comments, and commit messages in English.
 
-Empieza por el Commit 1. Antes de cada commit, dime qué vas a hacer y espera mi confirmación si el paso no es obvio.
+---
+
+## Stack
+
+| Layer | Choice |
+|---|---|
+| Framework | Next.js, App Router, TypeScript |
+| Hosting | Vercel |
+| Database | Supabase (Postgres) |
+| Auth | Supabase Auth, Google provider |
+| Vision + LLM | Gemini API (free tier), server-side route handlers only |
+| QR | client-side library |
+| Styling | Tailwind |
+
+Free tier only. No paid services.
+
+---
+
+## Non-negotiable constraints
+
+1. **No secret ever reaches the browser.** All Gemini and Supabase service calls happen in server route handlers. `.env.local` is gitignored in the first commit, before any key exists.
+2. **The camera photo is never persisted.** It goes to the vision model, returns a boolean, and is discarded. Never written to disk, to Supabase Storage, or to a log.
+3. **The simulation label is always visible on screen 3**, above the fold, before the user scrolls. Text: `Transferencia simulada. No se mueve dinero real.`
+4. **The interface never says "verificado", "seguro", or "confirmado" about a person, a document, or a transaction.** The only success message is about the channel: `Sí llegó la notificación.` This wording is a product requirement, not a copy preference.
+5. **RLS is enabled at table creation**, not retrofitted.
+6. **All seed and demo data is invented and labeled.** No real person's name, phone, or account appears anywhere.
+
+---
+
+## Data model
+
+```sql
+create table stands (
+  id uuid primary key default gen_random_uuid(),
+  supplier_id uuid not null references auth.users(id),
+  merchant_name text not null check (char_length(merchant_name) between 2 and 80),
+  stand_type text not null check (char_length(stand_type) between 2 and 60),
+  clabe text not null check (clabe ~ '^[0-9]{18}$'),
+  status text not null default 'pending' check (status in ('confirmed','pending')),
+  created_at timestamptz not null default now()
+);
+
+create table card_texts (
+  id uuid primary key default gen_random_uuid(),
+  stand_id uuid not null references stands(id) on delete cascade,
+  body text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table stands enable row level security;
+alter table card_texts enable row level security;
+```
+
+RLS policies: a supplier may select, insert, and update only rows where `supplier_id = auth.uid()`. For `card_texts`, access is granted through the parent stand's `supplier_id`.
+
+---
+
+## Features, in build order
+
+Each feature is independently testable and ends in a commit.
+
+### F1 — Project skeleton and auth gate
+
+Next.js app, Tailwind, Supabase client. Sign in with Google. Routes `/setup` and `/stands` redirect to sign-in when signed out.
+
+**Acceptance:** signed out, `/setup` redirects and shows no stand data. Signed in, it renders. `.env.local` is gitignored and no key appears in any committed file.
+
+### F2 — Merchant details form with validation
+
+Screen 2. Fields: merchant name, stand type, CLABE.
+
+Validation runs on both client and server. Merchant name 2–80 characters. Stand type 2–60. CLABE exactly 18 digits, numeric only. Errors render inline in Spanish, next to the offending field. The form cannot advance while invalid.
+
+**Acceptance:** 17 digits rejected. 19 digits rejected. Letters rejected. Empty rejected. A 500-character paste into merchant name is refused, not truncated silently. Nothing over-length reaches the database.
+
+### F3 — Notification test screen with vision check
+
+Screen 3. Renders the simulation warning band first. Shows destination summary with the CLABE masked to its last four digits. A button sends the simulated 1 MXN transfer — this is a stub, no financial API, and the screen says so.
+
+Then a photo upload or camera capture. The image is posted to a server route that calls the vision model with a single question: does this phone screen show a bank deposit notification, yes or no. Do not ask the model to read the amount, evaluate legitimacy, or interpret contents. It returns a boolean and a short reason string.
+
+On true: stand status set to `confirmed`, success message `Sí llegó la notificación`.
+On false: show a retry with guidance for the supplier to help switch notifications on. After two failures, set status to `pending` and continue to card generation anyway.
+
+The image is discarded after the call. It is never written anywhere.
+
+**Acceptance:** the warning band is visible without scrolling. A photo of a screen with a deposit notification returns confirmed. A photo of a blank screen returns not found and offers retry. Two failures produce `pending` and still reach screen 4. After a successful check, no image exists in storage or in the database.
+
+### F4 — Card generation and QR
+
+Screen 4. A server route calls the text model with the merchant name and stand type.
+
+**The headline is hardcoded in the application, not generated:** `Aquí entregamos cuando cae el dinero`. The model produces only the two middle lines, naming the actual goods, at a low reading level, in Spanish, maximum 20 words total. The universality line is also hardcoded: `Es la regla de este puesto. Es para todos, siempre.`
+
+The generated body is saved to `card_texts` on first generation. Subsequent views and reprints read the saved row — they never regenerate. A card must be identical every time it is printed.
+
+Render the card print-ready with a QR pointing at `/regla/[stand_id]`. Buttons: print, and send.
+
+**Acceptance:** generating for "leche y maíz" and for "flores" produces identical headlines and correctly different middle lines. Navigating away and returning reprints byte-identical text. The model output is length-capped; an over-long generation is regenerated or truncated at a word boundary, never mid-word.
+
+### F5 — Stand list
+
+Screen 5. The supplier's visited stands, each showing merchant name, stand type, status badge, and date. Ordered newest first.
+
+**Acceptance:** signed in as supplier B, supplier A's stands do not appear. Verify by querying directly with supplier B's token, not only through the UI.
+
+### F6 — Public rule page
+
+`/regla/[stand_id]`, unauthenticated. Renders the card's rule text and the stand name. Nothing else.
+
+**Acceptance:** the page exposes no CLABE, no phone number, no supplier identity, and no timestamps. Confirm by reading the page source, not just the rendered output.
+
+---
+
+## Commit plan
+
+Minimum five commits, minimum two deploys.
+
+| # | Commit | Deploy |
+|---|---|---|
+| 1 | `chore: scaffold next app, tailwind, supabase client, gitignore env` | — |
+| 2 | `feat: google auth and route protection` | **Deploy 1** — verify the auth gate on the live URL |
+| 3 | `feat: merchant form with client and server validation` | — |
+| 4 | `feat: notification test with vision check and simulation label` | — |
+| 5 | `feat: card generation, persistence, and qr` | **Deploy 2** — verify card generation live |
+| 6 | `feat: stand list and public rule page` | — |
+| 7 | `fix: <the bug found in the mechanical pass>` | **Deploy 3** — required by the test-fix-redeploy cycle |
+
+Deploy 1 exists to catch auth and environment-variable problems early, while the app is small enough to debug.
+
+---
+
+## Session close, every session
+
+1. Update `DECISIONS.md` — what was decided and why, not what was typed.
+2. Write tomorrow's first move as a concrete action, not a topic.
+3. Commit and push.
+
+---
+
+## Out of scope — do not build
+
+- Receipt reading, uploading, scoring, or detection of any kind
+- Real banking API integration
+- Merchant accounts or merchant login
+- The WhatsApp thread and Banxico CEP lookup (a teammate's slice)
+- Pricing, subscriptions, payment processing
+- Analytics or scan tracking on the public rule page
+- Any UI state that says a person, document, or transaction is verified
