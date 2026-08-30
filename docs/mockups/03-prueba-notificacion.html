@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Mockup — Pantalla 3: Prueba de notificación</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --ink: #16181c;
+    --ink-soft: #52565c;
+    --ink-faint: #8a8f98;
+    --line: #e2e4e8;
+    --paper: #ffffff;
+    --page-bg: #eef0f3;
+    --brand: #0f7a4d;
+    --brand-dark: #0b5c3a;
+    --warn-bg: #fef3e2;
+    --warn-border: #d98a12;
+    --warn-text: #7a4a06;
+    --success-bg: #e9f7ee;
+    --success-border: #0f7a4d;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 48px 16px;
+    background: var(--page-bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .doc-header {
+    max-width: 380px;
+    text-align: center;
+  }
+
+  .doc-header .eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 6px;
+  }
+
+  .doc-header h1 {
+    font-size: 18px;
+    margin: 0 0 4px;
+  }
+
+  .doc-header p {
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin: 0;
+  }
+
+  /* Phone frame */
+  .device {
+    width: 360px;
+    background: #1c1d20;
+    border-radius: 44px;
+    padding: 14px;
+    box-shadow: 0 30px 60px -20px rgba(20, 22, 26, 0.45);
+  }
+
+  .screen {
+    background: var(--paper);
+    border-radius: 30px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 640px;
+  }
+
+  .statusbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 22px 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .statusbar .icons {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .notch {
+    position: relative;
+    width: 90px;
+    height: 22px;
+    background: #1c1d20;
+    border-radius: 0 0 16px 16px;
+    margin: 0 auto;
+  }
+
+  .content {
+    flex: 1;
+    padding: 14px 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .warning-band {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    color: var(--warn-text);
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 13.5px;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+
+  .warning-band svg { flex-shrink: 0; margin-top: 1px; }
+
+  .step-eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 4px 0 0;
+  }
+
+  h2.screen-title {
+    font-size: 20px;
+    margin: 2px 0 0;
+    color: var(--ink);
+  }
+
+  .screen-subtitle {
+    font-size: 14px;
+    color: var(--ink-soft);
+    margin: 0;
+    line-height: 1.45;
+  }
+
+  .destination-card {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: #fafbfc;
+  }
+
+  .destination-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .destination-row .label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .destination-row .value {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+    text-align: right;
+  }
+
+  .destination-row .value.mono {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.03em;
+  }
+
+  .btn {
+    display: block;
+    width: 100%;
+    text-align: center;
+    border: none;
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 15.5px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: default;
+  }
+
+  .btn-primary {
+    background: var(--brand);
+    color: #fff;
+  }
+
+  .camera-slot {
+    border: 2px dashed var(--line);
+    border-radius: 14px;
+    padding: 22px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    text-align: center;
+    color: var(--ink-soft);
+    background: #fafbfc;
+  }
+
+  .camera-slot svg { color: var(--ink-faint); }
+
+  .camera-slot .cta {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .camera-slot .hint {
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    margin: 0;
+  }
+
+  .success-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: var(--success-bg);
+    border: 1px solid var(--success-border);
+    border-radius: 14px;
+    padding: 14px 16px;
+  }
+
+  .success-banner .icon {
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--brand);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .success-banner .text strong {
+    display: block;
+    font-size: 15.5px;
+    color: var(--brand-dark);
+  }
+
+  .success-banner .text span {
+    display: block;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    margin-top: 2px;
+  }
+
+  .home-indicator {
+    width: 120px;
+    height: 4px;
+    border-radius: 2px;
+    background: #d8dade;
+    margin: 10px auto 14px;
+  }
+
+  .doc-footer {
+    max-width: 380px;
+    text-align: center;
+    font-size: 11.5px;
+    color: var(--ink-faint);
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+  <div class="doc-header">
+    <p class="eyebrow">Mockup de referencia · No es parte de la aplicación</p>
+    <h1>Pantalla 3 — Prueba de notificación</h1>
+    <p>Entrego cuando cae el dinero · docs/PACKET.md §9.1</p>
+  </div>
+
+  <div class="device">
+    <div class="notch"></div>
+    <div class="screen">
+
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="icons">
+          <svg width="18" height="12" viewBox="0 0 18 12" fill="none">
+            <rect x="0" y="7" width="3" height="5" rx="0.5" fill="#16181c"/>
+            <rect x="5" y="5" width="3" height="7" rx="0.5" fill="#16181c"/>
+            <rect x="10" y="3" width="3" height="9" rx="0.5" fill="#16181c"/>
+            <rect x="15" y="0" width="3" height="12" rx="0.5" fill="#16181c"/>
+          </svg>
+          <svg width="24" height="12" viewBox="0 0 24 12" fill="none">
+            <rect x="0.5" y="0.5" width="20" height="11" rx="2.5" stroke="#16181c"/>
+            <rect x="2" y="2" width="17" height="8" rx="1.5" fill="#16181c"/>
+            <rect x="21.5" y="4" width="1.5" height="4" rx="0.75" fill="#16181c"/>
+          </svg>
+        </span>
+      </div>
+
+      <div class="content">
+
+        <div class="warning-band">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M10 2L18.5 17H1.5L10 2Z" stroke="#7a4a06" stroke-width="1.4" stroke-linejoin="round"/>
+            <rect x="9.3" y="8" width="1.4" height="4.6" rx="0.7" fill="#7a4a06"/>
+            <rect x="9.3" y="13.4" width="1.4" height="1.4" rx="0.7" fill="#7a4a06"/>
+          </svg>
+          <span>Transferencia simulada. No se mueve dinero real.</span>
+        </div>
+
+        <div>
+          <p class="step-eyebrow">Paso 3 de 4</p>
+          <h2 class="screen-title">Prueba de notificación</h2>
+          <p class="screen-subtitle">Confirma que la notificación del banco llega al teléfono del comercio.</p>
+        </div>
+
+        <div class="destination-card">
+          <div class="destination-row">
+            <span class="label">Comercio</span>
+            <span class="value">Jesús Ramírez</span>
+          </div>
+          <div class="destination-row">
+            <span class="label">CLABE</span>
+            <span class="value mono">••••• ••••• •••• 4821</span>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" type="button">Enviar 1 peso de prueba</button>
+
+        <div class="camera-slot">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
+            <path d="M4 8h2.2l1-2h9.6l1 2H20a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <circle cx="12" cy="13.5" r="3.4" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+          <span class="cta">Tome una foto de la pantalla de Jesús</span>
+          <p class="hint">La foto se usa una sola vez y no se guarda.</p>
+        </div>
+
+        <div class="success-banner">
+          <span class="icon">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M2.5 7.3L5.4 10.2L11.5 3.9" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span class="text">
+            <strong>Sí llegó la notificación.</strong>
+            <span>El teléfono del comercio mostró el aviso de depósito.</span>
+          </span>
+        </div>
+
+      </div>
+
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+
+  <div class="doc-footer">
+    Mockup estático, sin lógica ni datos reales. Nombre y CLABE son ejemplos
+    inventados (ver Piso de seguridad, docs/PACKET.md §12).
+  </div>
+
+</body>
+</html>
