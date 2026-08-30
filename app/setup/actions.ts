@@ -51,19 +51,23 @@ export async function createStand(
   }
 
   const input = normalizeStandInput(rawInput);
-  const { error } = await supabase.from("stands").insert({
-    supplier_id: user.id,
-    merchant_name: input.merchantName,
-    stand_type: input.standType,
-    clabe: input.clabe,
-  });
+  const { data: stand, error } = await supabase
+    .from("stands")
+    .insert({
+      supplier_id: user.id,
+      merchant_name: input.merchantName,
+      stand_type: input.standType,
+      clabe: input.clabe,
+    })
+    .select("id")
+    .single();
 
-  if (error) {
+  if (error || !stand) {
     console.error("[createStand] insert into stands failed", {
-      code: error.code,
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
+      code: error?.code,
+      message: error?.message,
+      details: error?.details,
+      hint: error?.hint,
     });
     return {
       values: rawInput,
@@ -72,5 +76,5 @@ export async function createStand(
     };
   }
 
-  redirect("/stands");
+  redirect(`/setup/${stand.id}/prueba`);
 }
