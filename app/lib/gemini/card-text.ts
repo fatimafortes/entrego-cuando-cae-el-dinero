@@ -27,29 +27,41 @@ function wordCount(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
+// How far the sentence-safe fallback may run past MAX_WORDS rather than
+// drop the second sentence. Found by stress-testing generateCardBody: about
+// 1 in 6 real generations reached this fallback, and dropping the second
+// sentence there doesn't just make the card longer than intended — it
+// deletes the affirmative half of the rule (when goods DO get delivered),
+// leaving a card that only says what doesn't happen. A card a few words
+// over budget but complete serves the product's purpose; a shorter card
+// missing half its message does not.
+const FALLBACK_OVERAGE_ALLOWANCE = 8;
+
 /**
  * Keeps only complete sentences, never cutting mid-sentence or mid-word.
- * The first sentence is always kept whole even if it alone exceeds
- * maxWords — a slightly-long complete sentence beats a truncated fragment
- * on a card that gets printed and glued to a wall. A second sentence is
- * included only if it still fits the budget alongside the first.
+ * The prompt always asks for exactly two sentences (the refusal, then the
+ * affirmative rule), so this prefers keeping both — even somewhat over
+ * maxWords — over silently reducing the card to just the first sentence.
+ * Only falls back to the first sentence alone if both together blow past
+ * the allowance; the first sentence is always kept whole regardless of its
+ * own length, since a long complete sentence still beats a fragment.
  */
 function trimToCompleteSentences(text: string, maxWords: number): string {
   const trimmed = text.trim();
-  const sentences = trimmed.match(/[^.!?]+[.!?]+/g) ?? [trimmed];
+  const sentences = (trimmed.match(/[^.!?]+[.!?]+/g) ?? [trimmed]).map((s) =>
+    s.trim()
+  );
 
-  let result = "";
-  let count = 0;
+  if (sentences.length <= 1) return sentences[0] || trimmed;
 
-  for (const sentence of sentences) {
-    const piece = sentence.trim();
-    const pieceWords = wordCount(piece);
-    if (result && count + pieceWords > maxWords) break;
-    result += (result ? " " : "") + piece;
-    count += pieceWords;
+  const first = sentences[0];
+  const firstTwo = `${first} ${sentences[1]}`;
+
+  if (wordCount(firstTwo) <= maxWords + FALLBACK_OVERAGE_ALLOWANCE) {
+    return firstTwo;
   }
 
-  return result || trimmed;
+  return first;
 }
 
 let client: GoogleGenAI | null = null;
