@@ -238,24 +238,38 @@ Two tables:
 
 ### 11.1 Mechanical pass
 
-| # | What is tested | Steps | Pass criterion |
-|---|---|---|---|
-| T1 | Auth gate | Open `/setup` while signed out | Redirected to sign-in. No stand data visible. |
-| T2 | CLABE validation | Enter 17 digits, 19 digits, letters, empty | Each rejected with an inline message. Cannot continue. |
-| T3 | Field length limits | Paste 500 characters into merchant name | Truncated or rejected at the limit. Nothing over-length reaches the database. |
-| T4 | Simulation label | Reach screen 3 | The warning band is visible without scrolling. |
-| T5 | Vision — positive | Photograph a screen showing a deposit notification | Returns confirmed; stand status set to `confirmed`. |
-| T6 | Vision — negative | Photograph a screen with no notification | Returns not found; retry offered. |
-| T7 | Retry ceiling | Fail the check twice | Stand marked `pending`; card still generates with QR. |
-| T8 | Card content | Generate for "leche y maíz", then for "flores" | Headline identical in both. Middle lines name the correct goods. |
-| T9 | Reprint stability | Generate, leave, return, reprint | Card text byte-identical to the first generation. |
-| T10 | RLS isolation | Sign in as supplier B; attempt to read supplier A's stand | No rows returned. |
-| T11 | Photo not persisted | Complete a check, then inspect storage and database | No image stored anywhere. |
-| T12 | Public QR page | Open the QR target signed out | Rule text visible. No CLABE, no merchant phone, no supplier identity. |
+**Run:** 2026-08-30, against the live Vercel deployment's database (Supabase project `rexzyqqzcxaukapgeszf`), by the coding agent, not manually in a browser — no browser-automation tool was available in that session. Two synthetic suppliers ("Supplier A", "Supplier B") were created directly via the Supabase Admin API (email+password, no relation to any real account) to obtain real, valid session cookies without going through Google — the same cookie format (`sb-<project-ref>-auth-token`, base64url-encoded session JSON) that `@supabase/ssr` sets for a real Google login. Every test below hit the actual running Next.js server actions and route handlers (`createStand`, `/api/notification-check`, the card and rule pages) over real HTTP, not a mock. All synthetic suppliers, stands, and card text created for this pass were deleted afterward via the service-role key; nothing from this run remains in the database.
+
+| # | What is tested | Steps | Pass criterion | Result | Evidence |
+|---|---|---|---|---|---|
+| T1 | Auth gate | Open `/setup` while signed out | Redirected to sign-in. No stand data visible. | **PASS** | `GET /setup` and `/stands` with no session cookie both returned `307` to `/login?next=...`; response body had no stand data. |
+| T2 | CLABE validation | Enter 17 digits, 19 digits, letters, empty | Each rejected with an inline message. Cannot continue. | **PASS** | All four submitted directly to `createStand`. Each returned `200` (no redirect — form did not advance) with the exact inline message "La CLABE debe tener exactamente 18 dígitos, solo números." Confirmed zero rows written for that supplier afterward. |
+| T3 | Field length limits | Paste 500 characters into merchant name | Nothing over-length reaches the database; refused, not silently truncated. | **PASS** | Submitted a 500-`a` merchant name with a valid CLABE. Rejected with "El nombre debe tener entre 2 y 80 caracteres."; the field echoed back all 500 characters (not cut to 80), and no row was written. |
+| T4 | Simulation label | Reach screen 3 | The warning band is visible without scrolling. | **PASS** | The warning band is the first element rendered inside the screen's content flow, before the title, before the destination card — confirmed from the raw server-rendered HTML. Full pixel/viewport confirmation is the supplier's own earlier manual check in this build session ("La banda de simulación se ve sin scroll"), since this test run had no browser to screenshot with. |
+| T5 | Vision — positive | Photograph a screen showing a deposit notification | Returns confirmed; stand status set to `confirmed`. | **PASS** | Uploaded `test-assets/notification-check/con-notificacion.png` to `/api/notification-check` as the real authenticated supplier → `{"visible":true,...}`. Confirmed the same RLS-scoped update `finalizeStandStatus` performs (`status → confirmed`) succeeds for the owning supplier and is visible via the service-role key afterward. |
+| T6 | Vision — negative | Photograph a screen with no notification | Returns not found; retry offered. | **PASS** | Uploaded `sin-notificacion.png` → `{"visible":false,...}`, reason text correctly describes a home screen with no notification. |
+| T7 | Retry ceiling | Fail the check twice | Stand marked `pending`; card still generates with QR. | **PASS** | Two consecutive `sin-notificacion.png` uploads both returned `visible:false`. The card screen for that stand remained reachable and rendered the fixed headline immediately afterward, regardless of status. (`pending` is also the column default, so this doesn't independently prove the write path beyond what T5 already proves generically for `status` updates; the exact 2-strikes UI transition was confirmed visually by the supplier earlier in this build session.) |
+| T8 | Card content | Generate for "leche y maíz", then for "flores" | Headline identical in both. Middle lines name the correct goods. | **PASS** | Headline byte-identical ("Aquí entregamos cuando cae el dinero") across both. Middle lines: "No entregamos **leche y maiz**..." vs. "No entregamos **flores**..." — each names its own goods, neither the other's. |
+| T9 | Reprint stability | Generate, leave, return, reprint | Card text byte-identical to the first generation. | **PASS** | Fetched the same card screen twice in a row; the generated body string was byte-identical both times (confirmed via string equality, not eyeballing). |
+| T10 | RLS isolation | Sign in as supplier B; attempt to read supplier A's stand | No rows returned. | **PASS** | As Supplier B: `select *` on `stands` → `[]`; `select` filtered to Supplier A's specific stand id → `[]`; `update` attempt on that same id → 0 rows affected, and Supplier A's row was confirmed unchanged afterward via the service-role key. Supplier B's own `/stands` page also correctly rendered the empty state. |
+| T11 | Photo not persisted | Complete a check, then inspect storage and database | No image stored anywhere. | **PASS** | Supabase Storage has zero buckets in this project. `stands` has no image/photo column (`id, supplier_id, merchant_name, stand_type, clabe, status, created_at` only). Source of the photo-handling path (`app/api/notification-check`, `app/lib/gemini`) contains no filesystem write and no Storage call. |
+| T12 | Public QR page | Open the QR target signed out | Rule text visible. No CLABE, no merchant phone, no supplier identity. | **PASS** | `GET /regla/<id>` with no session → `200`, rule text and merchant name present. Grepped the full response body for the stand's CLABE, `supplier_id`, and its `created_at` timestamp — none present. An unknown stand id correctly returns `404`. |
+
+**Result: 12/12 pass.** No test in this checklist currently fails — every prior bug this build hit (the OAuth redirect landing on `/` instead of `/auth/callback`, the missing table `GRANT`s, the mid-sentence card truncation, the mid-sentence capitalization, the silently-swallowed card-save error) was found and fixed earlier in the same build session, before this formal pass was run. See §11.2 for the one real defect found *while* running this pass, outside the checklist above.
 
 ### 11.2 Bug found, fixed, redeployed
 
-> ⏳ To be filled during the build. Requires: description, cause, fix, commit hash, redeploy confirmation.
+**Description.** While stress-testing `generateCardBody` beyond the T1–T12 checklist (16 real Gemini calls across two stand types, checking for the mid-sentence truncation this build had already fixed once), a second, subtler defect surfaced in the same fallback path: when the model missed the 20-word cap twice in a row, the fallback kept only the card's *first* sentence — the refusal ("no entregamos leche y maíz solo con el comprobante") — and silently dropped the second: the actual rule ("entregamos cuando suena la notificación del banco"). The result was grammatically complete (no bug by the previous fix's own test) but said only what doesn't happen and never what does, on a card whose entire purpose is stating that rule. Observed in roughly 1 of every 6–10 real generations.
+
+**Cause.** `trimToCompleteSentences` accumulated sentences one at a time and stopped as soon as adding the next would exceed `MAX_WORDS` (20). The prompt always requests exactly two sentences, but the trimming logic treated the word cap as more important than sentence count — so the moment the two sentences together ran even one word over budget, the second was dropped entirely rather than the budget being relaxed.
+
+**Fix.** The fallback now tries to keep *both* sentences whenever they fit within `MAX_WORDS + 8` (a bounded allowance, not unlimited), and only drops to the first sentence alone if even that's exceeded. A card a few words over the low-reading-level target but stating the complete rule serves the product; a shorter card missing half its message does not. Re-ran 10 fresh generations after the fix: the fallback triggered once, and that time it kept both sentences.
+
+**Commit.** `0a536a0` — `fix: card fallback was dropping the affirmative half of the rule`.
+
+**Redeploy.** Pushed to `main` immediately after the commit (`aefdb3a..0a536a0`), triggering Vercel's auto-deploy from GitHub. This is Deploy 3 in the build's commit plan.
+
+**Evidence limit, owned.** This defect was not caught by the T1–T12 checklist itself — none of the twelve tests generate enough cards to hit a ~1-in-6 fallback path, and T8/T9 only check headline identity and reprint stability, not sentence completeness under the retry-fallback branch. It was caught by deliberately exceeding the checklist's coverage, not by the checklist. Worth carrying forward: the mechanical pass tests the happy path and a few explicit edge cases well, but a low-probability generation-quality regression like this one needs either a larger fuzz run or a dedicated content-completeness assertion to catch reliably — right now it only surfaces via a `console.error` log line and manual reading.
 
 ### 11.3 Persona test — Layer 1
 
