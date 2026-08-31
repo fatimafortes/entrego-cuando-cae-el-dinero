@@ -125,12 +125,18 @@ export function StandForm() {
           onChange={(e) => updateField("clabe", e.target.value)}
           onBlur={() => touchField("clabe")}
           aria-invalid={Boolean(errorFor("clabe"))}
-          aria-describedby={errorFor("clabe") ? "clabe-error" : undefined}
+          aria-describedby={
+            errorFor("clabe") ? "clabe-hint clabe-error" : "clabe-hint"
+          }
           placeholder="18 dígitos"
           className={`mt-1 w-full rounded-lg border px-3 py-3 text-base text-neutral-900 focus:outline-none focus:ring-2 focus:ring-black ${
             errorFor("clabe") ? "border-red-500" : "border-neutral-300"
           }`}
         />
+        <p id="clabe-hint" className="mt-1 text-sm text-neutral-600">
+          Este número solo sirve para recibir dinero, nunca para sacarlo. Es
+          el mismo que usas para que te depositen.
+        </p>
         {errorFor("clabe") && (
           <p id="clabe-error" className="mt-1 text-sm text-red-600">
             {errorFor("clabe")}
