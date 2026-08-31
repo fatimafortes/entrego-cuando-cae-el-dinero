@@ -279,7 +279,54 @@ Two tables:
 
 **Note on what is actually being tested.** Jesús is not the person operating the app — the supplier is. What Jesús must do is show his own phone screen and, if notifications are off, find the setting with someone standing in front of him waiting. That is the moment to test: not the interface, but whether a slow reader can complete a bank-app settings task under social pressure without going silent. The fact-check found a user who went to a branch and still could not get notifications working, which suggests this step fails even with human help.
 
-> ⏳ Log to be filled after the run. Deliverable: `PERSONA_fatima.pdf`.
+**Run:** 2026-08-30. Synthetic user: Jesús, as described above — the
+persona this packet is built around, not the real Jesús from the original
+user research (who appears nowhere in this repo, per the security floor).
+Screenshots of the actual build, in flow order, pasted into a fresh chat
+with the persona loaded. Full transcript: `PERSONA_fatima.pdf`.
+
+**Findings, in order of severity.**
+
+1. **(Fixed) The CLABE field asked for his account number with no
+   explanation of what it does.** His own words: *"¿Es el que sirve para
+   que me llegue dinero, o es el que sirve para que me lo saquen? Para mí
+   es el mismo número. Nadie me ha explicado nunca que sean cosas
+   distintas."* This is the worst finding because of who is answering:
+   Jesús already lost money once to a forged receipt, and he was explicit
+   that faced with an unexplained request for his account number, he would
+   say nothing and not ask — the exact silence Condition 2 exists to
+   design around. An interface that goes quiet on him at the one moment he
+   needs a plain-language answer reproduces the failure mode this whole
+   slice is supposed to prevent, not just a confusing form field.
+   **Fixed** with a short, permanent hint under the field (commit
+   `112fb80`): the number only receives money, never sends it, and it's
+   the same one he already gives out to get paid. Chosen over the other
+   possible findings from this run because it's the only one that's an
+   actual defect in the shipped interface, not a limit of the test method
+   (see #2) — and because it sits upstream of everything else: a supplier
+   who can't get a straight answer about the CLABE field may not finish
+   the form at all.
+
+2. **Method limitation, not a product defect: the photo-taking moment
+   cannot be tested by a screenshot walkthrough.** The persona concluded
+   that no one had actually taken the photo of Jesús's phone, because
+   there was no screenshot showing that physical act — only a screen
+   before it and a screen after. That conclusion is correct given what the
+   persona was shown, and it is not evidence the real flow fails: a static
+   screenshot sequence cannot depict a supplier holding up a camera any
+   more than it can depict Jesús reading slowly. Recorded here rather than
+   fixed, because there is nothing in the product to fix — it's a ceiling
+   on this method. Testing the actual physical moment needs either a video
+   walkthrough or the real persona test this layer is a stand-in for: a
+   live run with an actual slow-reading merchant and an actual supplier
+   holding an actual phone.
+
+**What worked.** The generated card (screen 4) was the only screen the
+persona responded to positively, and he named the exact mechanism this
+slice is built on: *"Con el letrero ya no soy yo el que desconfía de él,
+es el letrero."* That is Condition 2 — the rule carries the suspicion so
+no person has to — landing with the person it protects, in his own words,
+not just surviving my own design review of it.
 
 ---
 
